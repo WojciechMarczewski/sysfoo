@@ -27,40 +27,46 @@ pipeline {
       }
     }
 
-    stage('package') {
-      parallel {
-        stage('package') {
-          agent {
-            docker {
-              image 'maven:3.9.6-eclipse-temurin-17-alpine'
-            }
-
-          }
-          steps {
-            echo 'package maven app'
-            sh 'mvn package -DskipTests'
-            archiveArtifacts '**/target/*.jar'
-          }
-        }
-
-        stage('Docker B&P') {
-          agent any
-          steps {
-            script {
-              docker.withRegistry('https://index.docker.io/v1/', 'dockerlogin') {
-                def commitHash = env.GIT_COMMIT.take(7)
-                def dockerImage = docker.build("vvoytas/sysfoo:${commitHash}", "./")
-                dockerImage.push()
-                dockerImage.push("latest")
-                dockerImage.push("dev")
+      stage('package app') {
+        parallel {
+          stage('package') {
+            agent {
+              docker {
+                image 'maven:3.9.6-eclipse-temurin-17-alpine'
               }
+  
             }
-
+            when{
+              branch 'main'
+            }
+            steps {
+              echo 'package maven app'
+              sh 'mvn package -DskipTests'
+              archiveArtifacts '**/target/*.jar'
+            }
           }
+  
+          stage('Docker B&P') {
+            agent any
+             when{
+              branch 'main'
+            }
+            steps {
+              script {
+                docker.withRegistry('https://index.docker.io/v1/', 'dockerlogin') {
+                  def commitHash = env.GIT_COMMIT.take(7)
+                  def dockerImage = docker.build("vvoytas/sysfoo:${commitHash}", "./")
+                  dockerImage.push()
+                  dockerImage.push("latest")
+                  dockerImage.push("dev")
+                }
+              }
+  
+            }
+          }
+  
         }
-
       }
-    }
 
   }
   tools {
